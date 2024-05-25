@@ -1,6 +1,6 @@
 package com.jiang.friendsGatheringBackend.service;
 
-import com.jiang.friendsGatheringBackend.model.domain.user;
+import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -9,7 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 * @description 针对表【user(用户)】的数据库操作Service
 * @createDate 2024-05-05 10:44:37
 */
-public interface UserService extends IService<user> {
+public interface UserService extends IService<User> {
 
     /**
      * 用户注册
@@ -31,7 +31,7 @@ public interface UserService extends IService<user> {
      * @param request   http请求
      * @return 脱敏后的用户信息
      */
-    user userLogin(String userAccount, String password, HttpServletRequest request);
+    User userLogin(String userAccount, String password, HttpServletRequest request);
 
     /**
      * 用户脱敏
@@ -39,5 +39,5 @@ public interface UserService extends IService<user> {
      * @param originUser
      * @return 脱敏后的用户信息
      */
-    user getSafetyUser(user originUser);
+    User getSafetyUser(User originUser);
 }

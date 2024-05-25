@@ -4,9 +4,9 @@ import com.jiang.friendsGatheringBackend.common.BaseResponse;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
 import com.jiang.friendsGatheringBackend.common.ResultUtils;
 import com.jiang.friendsGatheringBackend.exception.BusinessException;
-import com.jiang.friendsGatheringBackend.model.domain.request.userLoginRequest;
-import com.jiang.friendsGatheringBackend.model.domain.request.userRegisterRequest;
-import com.jiang.friendsGatheringBackend.model.domain.user;
+import com.jiang.friendsGatheringBackend.model.request.userLoginRequest;
+import com.jiang.friendsGatheringBackend.model.request.userRegisterRequest;
+import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.impl.UserServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
@@ -57,7 +57,7 @@ public class userController {
      * @param request
      * @return
      */
-    public BaseResponse<user> userLogin(userLoginRequest userLoginRequest1, HttpServletRequest request){
+    public BaseResponse<User> userLogin(userLoginRequest userLoginRequest1, HttpServletRequest request){
         if(userLoginRequest1==null){
             return ResultUtils.error(ErrorCode.PARAMS_ERROR);
         }
@@ -66,7 +66,7 @@ public class userController {
         if(StringUtils.isAnyBlank(userAccount,userPassword)){
             return  ResultUtils.error(ErrorCode.PARAMS_ERROR);
         }
-        user user1= userService.userLogin(userAccount,userPassword,request);
+        User user1= userService.userLogin(userAccount,userPassword,request);
         return ResultUtils.success(user1);
     }
 

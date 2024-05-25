@@ -3,7 +3,7 @@ package com.jiang.friendsGatheringBackend.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jiang.friendsGatheringBackend.mapper.UserMapper;
-import com.jiang.friendsGatheringBackend.model.domain.user;
+import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,7 +24,7 @@ import static com.jiang.friendsGatheringBackend.constant.userConstant.USER_LOGIN
 */
 @Service
 @Slf4j
-public class UserServiceImpl extends ServiceImpl<UserMapper, user>
+public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService{
 
     public static final String SALT = "jiang";
@@ -69,14 +69,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, user>
             return -1;
         }
         //账户不能重复
-        QueryWrapper<user> queryWrapper = new QueryWrapper<user>();
+        QueryWrapper<User> queryWrapper = new QueryWrapper<User>();
         queryWrapper.eq("userAccount",userAccount);
         Long count = userMapper.selectCount(queryWrapper);
         if(count>0){
             return -1;
         }
         //星球编号不能重复
-        queryWrapper = new QueryWrapper<user>();
+        queryWrapper = new QueryWrapper<User>();
         queryWrapper.eq("planetCode",planetCode);
         count = userMapper.selectCount(queryWrapper);
         if(count>0){
@@ -85,7 +85,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, user>
         //2.加密
         String encryptedPassword = DigestUtils.md5DigestAsHex((SALT+password).getBytes());
         //3.向数据库插入用户数据
-        user u = new user();
+        User u = new User();
         u.setUserAccount(userAccount);
         u.setUserPassword(encryptedPassword);
         u.setPlanetCode(planetCode);
@@ -106,7 +106,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, user>
      * @return
      */
     @Override
-    public user userLogin(String userAccount, String password, HttpServletRequest request) {
+    public User userLogin(String userAccount, String password, HttpServletRequest request) {
         //1.校验用户账户和密码是否合法
         if(StringUtils.isAnyBlank(userAccount,password)){
             return null;
@@ -126,17 +126,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, user>
         //2.加密
         String encryptedPassword = DigestUtils.md5DigestAsHex((SALT+password).getBytes());
         //查询数据库，校验密码是否正确
-        QueryWrapper<user> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userPassword",encryptedPassword);
         queryWrapper.eq("userAccount",userAccount);
-        user user1 = userMapper.selectOne(queryWrapper);
+        User user = userMapper.selectOne(queryWrapper);
         //用户不存在
-        if(user1==null){
+        if(user==null){
             log.info("userLogin failed,userAccount can not match userPassword");
             return null;
         }
         //3.用户脱敏
-        user safetyUser = getSafetyUser(user1);
+        User safetyUser = getSafetyUser(user);
         //4.记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE,safetyUser);
 
@@ -150,11 +150,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, user>
      * @return 信息脱敏后的用户
      */
     @Override
-    public user getSafetyUser(user originUser) {
+    public User getSafetyUser(User originUser) {
         if(originUser==null){
             return null;
         }
-        user safetyUser = new user();
+        User safetyUser = new User();
         safetyUser.setId(originUser.getId());
         safetyUser.setUsername(originUser.getUsername());
         safetyUser.setUserAccount(originUser.getUserAccount());

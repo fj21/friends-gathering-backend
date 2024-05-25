@@ -1,4 +1,4 @@
-package com.jiang.friendsGatheringBackend.model.domain.request;
+package com.jiang.friendsGatheringBackend.model.request;
 
 import lombok.Data;
 
