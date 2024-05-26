@@ -15,6 +15,7 @@ import org.springframework.util.DigestUtils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.jiang.friendsGatheringBackend.constant.userConstant.ADMIN_ROLE;
 import static com.jiang.friendsGatheringBackend.constant.userConstant.USER_LOGIN_STATE;
 
 /**
@@ -168,6 +169,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setUserRole(originUser.getUserRole());
         safetyUser.setPlanetCode(originUser.getPlanetCode());
         return safetyUser;
+    }
+
+    /**
+     * 是否为管理员
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public boolean isAdmin(HttpServletRequest request) {
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User user = (User) userObj;
+        if(user==null){
+            return false;
+        }
+        return user.getUserRole() == ADMIN_ROLE;
+    }
+
+    /**
+     * 是否为管理员
+     *
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public boolean isAdmin(User loginUser) {
+        if(loginUser==null) {
+            return false;
+        }
+        return loginUser.getUserRole()==ADMIN_ROLE;
     }
 
 
