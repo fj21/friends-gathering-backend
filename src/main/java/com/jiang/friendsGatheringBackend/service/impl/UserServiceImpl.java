@@ -2,6 +2,8 @@ package com.jiang.friendsGatheringBackend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.jiang.friendsGatheringBackend.common.ErrorCode;
+import com.jiang.friendsGatheringBackend.exception.BusinessException;
 import com.jiang.friendsGatheringBackend.mapper.UserMapper;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.UserService;
@@ -10,8 +12,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -199,6 +203,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return false;
         }
         return loginUser.getUserRole()==ADMIN_ROLE;
+    }
+
+    /**
+     * 根据标签搜索用户
+     * @param tagsNameList
+     * @return
+     */
+    @Override
+    public List<User> searchUsersByTags(List<String> tagsNameList) {
+        if(CollectionUtils.isEmpty(tagsNameList)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        return null;
     }
 
 

@@ -4,6 +4,8 @@ import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.util.List;
+
 /**
 * @author jiang
 * @description 针对表【user(用户)】的数据库操作Service
@@ -56,4 +58,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean isAdmin(User loginUser);
+
+    /**
+     * 根据标签搜索用户
+     *
+     * @param tagsNameList
+     * @return
+     */
+    List<User> searchUsersByTags(List<String> tagsNameList);
 }
