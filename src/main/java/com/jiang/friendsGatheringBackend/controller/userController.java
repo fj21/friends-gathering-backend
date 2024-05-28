@@ -9,12 +9,13 @@ import com.jiang.friendsGatheringBackend.model.request.userLoginRequest;
 import com.jiang.friendsGatheringBackend.model.request.userRegisterRequest;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.impl.UserServiceImpl;
-import jakarta.servlet.http.HttpServletRequest;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.stream.Collectors;
 

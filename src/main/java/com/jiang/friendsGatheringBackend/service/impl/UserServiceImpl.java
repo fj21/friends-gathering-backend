@@ -2,22 +2,29 @@ package com.jiang.friendsGatheringBackend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
 import com.jiang.friendsGatheringBackend.exception.BusinessException;
 import com.jiang.friendsGatheringBackend.mapper.UserMapper;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.UserService;
-import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.jiang.friendsGatheringBackend.constant.userConstant.ADMIN_ROLE;
 import static com.jiang.friendsGatheringBackend.constant.userConstant.USER_LOGIN_STATE;
@@ -33,7 +40,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService{
 
     public static final String SALT = "jiang";
-    @Resource
+    @Autowired
     private UserMapper userMapper;
 
     /**
@@ -215,11 +222,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if(CollectionUtils.isEmpty(tagsNameList)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-
-        return null;
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        List<User> userList = this.list(queryWrapper);
+        Gson gson = new Gson();
+        return userList.stream().filter(user -> {
+            String tagsStr = user.getTags();
+            Set<String> tempTagnameSet = gson.fromJson(tagsStr,new TypeToken<>(){}.getType());
+            tempTagnameSet = Optional.ofNullable(tempTagnameSet).orElse(new HashSet<>());
+            for(String tagName:tagsNameList){
+                if(!tempTagnameSet.contains(tagName)){
+                    return false;
+                }
+            }
+            return true;
+        }).map(this::getSafetyUser).collect(Collectors.toList());
     }
-
-
 }
 
 

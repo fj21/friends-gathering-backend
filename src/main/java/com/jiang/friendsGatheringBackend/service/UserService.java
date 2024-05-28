@@ -2,8 +2,9 @@ package com.jiang.friendsGatheringBackend.service;
 
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
-import jakarta.servlet.http.HttpServletRequest;
 
+
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
