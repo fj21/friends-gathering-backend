@@ -15,7 +15,7 @@ public class ResultUtils {
      * @param <T>
      */
     public static <T> BaseResponse<T> success(T data){
-        return new BaseResponse<>(0,data,"");
+        return new BaseResponse<>(0,data,"ok");
     }
 
     /**
@@ -28,6 +28,7 @@ public class ResultUtils {
         return new BaseResponse(errorCode);
     }
 
+
     /**
      * 失败
      *
@@ -39,5 +40,20 @@ public class ResultUtils {
         return new BaseResponse(errorCode.getCode(),null,errorCode.getMsg(),decrption);
     }
 
+    public static BaseResponse error(ErrorCode errorCode,String msg,String descrption){
+        return new BaseResponse(errorCode.getCode(),errorCode.getMsg(),errorCode.getDescrption());
+    }
 
+
+    /**
+     * 失败
+     *
+     * @param code
+     * @param message
+     * @param description
+     * @return
+     */
+    public static BaseResponse error(int code, String message, String description) {
+        return new BaseResponse(code,null,message,description);
+    }
 }

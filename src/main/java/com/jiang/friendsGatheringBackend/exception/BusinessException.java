@@ -33,6 +33,6 @@ public class BusinessException extends RuntimeException{
     public BusinessException(ErrorCode errorCode,String description){
         super(errorCode.getMsg());
         this.code=errorCode.getCode();
-        this.description=errorCode.getDescrption();
+        this.description=description;
     }
 }

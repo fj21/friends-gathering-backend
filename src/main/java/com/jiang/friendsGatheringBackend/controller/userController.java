@@ -72,6 +72,7 @@ public class userController {
             return  ResultUtils.error(ErrorCode.PARAMS_ERROR);
         }
         User user1= userService.userLogin(userAccount,userPassword,request);
+        if(user1==null)return ResultUtils.error(ErrorCode.NULL_ERROR,"未登录");
         return ResultUtils.success(user1);
     }
 

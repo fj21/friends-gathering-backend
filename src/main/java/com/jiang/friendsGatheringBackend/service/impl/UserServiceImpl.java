@@ -56,43 +56,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         //1.校验用户账户、密码、校验密码、星球编号是否符合要求
         //非空
         if(StringUtils.isAnyBlank(userAccount,password,checkPassword,planetCode)){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数不能为空");
         }
         //账户长度不小于4位
         if(userAccount.length()<4){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户长度不小于4位");
         }
         //密码不小于8位
         if(password.length()<8||checkPassword.length()<8){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"密码不小于8位");
         }
         //星球编号不大于5位
         if(planetCode.length()>5){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"星球编号不大于5位");
         }
         //账户不包含特殊字符
         String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
         boolean containsSpecialCharacter = Pattern.compile(validPattern).matcher(userAccount).find();
         if(containsSpecialCharacter){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户不能包含特殊字符");
         }
         //密码和校验密码相同
         if(!StringUtils.equals(password,checkPassword)){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"两次密码不相同");
         }
         //账户不能重复
         QueryWrapper<User> queryWrapper = new QueryWrapper<User>();
         queryWrapper.eq("userAccount",userAccount);
         Long count = userMapper.selectCount(queryWrapper);
         if(count>0){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户已存在");
         }
         //星球编号不能重复
         queryWrapper = new QueryWrapper<User>();
         queryWrapper.eq("planetCode",planetCode);
         count = userMapper.selectCount(queryWrapper);
         if(count>0){
-            return -1;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"星球编号重复");
         }
         //2.加密
         String encryptedPassword = DigestUtils.md5DigestAsHex((SALT+password).getBytes());
@@ -103,7 +103,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         u.setPlanetCode(planetCode);
         boolean isSaved = this.save(u); /// 这里的 this 是 service
         if(!isSaved){
-            return -1;
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"用户注册失败");
         }
         return u.getId();
     }
