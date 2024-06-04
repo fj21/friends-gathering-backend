@@ -76,6 +76,22 @@ public class userController {
         return ResultUtils.success(user1);
     }
 
+
+    /**
+     * 用户退出登录态
+     *
+     * @param request
+     * @return
+     */
+    @PostMapping("/logout")
+    public BaseResponse<Integer> userLogout(HttpServletRequest request) {
+        if(request == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        int result = userService.userLogout(request);
+        return ResultUtils.success(result);
+    }
+
     /**
      * 根据用户名搜索用户（管理员权限）
      * @param username
