@@ -249,6 +249,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return 1;
     }
+
+    /**
+     * 获取当前登录用户
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        if(userObj == null){
+            throw new BusinessException(ErrorCode.NO_AUTH);
+        }
+
+        return (User) userObj;
+    }
 }
 
 

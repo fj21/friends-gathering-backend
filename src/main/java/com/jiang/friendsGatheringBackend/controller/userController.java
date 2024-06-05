@@ -1,6 +1,7 @@
 package com.jiang.friendsGatheringBackend.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.jiang.friendsGatheringBackend.common.BaseResponse;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
 import com.jiang.friendsGatheringBackend.common.ResultUtils;
@@ -12,11 +13,14 @@ import com.jiang.friendsGatheringBackend.service.impl.UserServiceImpl;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -114,7 +118,12 @@ public class userController {
         return ResultUtils.success(list);
     }
 
-
+    /**
+     * 根据标签列表搜索用户
+     *
+     * @param tagNameList
+     * @return
+     */
     @PostMapping("/search/tags")
     public BaseResponse<List<User>> searchByTags(@RequestParam(required = false) List<String> tagNameList){
         if(CollectionUtils.isEmpty(tagNameList)){
@@ -122,6 +131,35 @@ public class userController {
         }
         List<User> userList = userService.searchUsersByTags(tagNameList);
         return ResultUtils.success(userList);
+    }
+
+    /**
+     * 为当前用户推荐 其他用户（从整个用户库中选一部分进行推荐、通过分页，限制展示的条数），
+     * 采用缓存实现，可以提升响应速度
+     *
+     * @param pageSize
+     * @param pageNum
+     * @param request
+     * @return
+     */
+    @GetMapping("/recommend")
+    public BaseResponse<Page<User>> recommend(long pageSize,long pageNum,HttpServletRequest request){
+        //获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        //从缓存中读取数据
+        String redisKey = String.format("friendsGathering:user:recommend:%s",loginUser.getId());
+        RedisTemplate<String,Object> redisTemplate = new RedisTemplate<>();
+        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+        Page<User> page = (Page<User>) valueOperations.get(redisKey);
+        if(page!=null){
+            return ResultUtils.success(page);
+        }
+        //如果无缓存,从数据库中读取
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        Page<User> userPage = userService.page(new Page<>(pageNum, pageSize), queryWrapper);
+        //写缓存
+        valueOperations.set(redisKey,userPage,24, TimeUnit.HOURS);
+        return ResultUtils.success(userPage);
     }
 
 
