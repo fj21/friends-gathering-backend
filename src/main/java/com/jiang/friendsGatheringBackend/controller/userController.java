@@ -18,6 +18,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,8 @@ public class userController {
     @Autowired
     private UserServiceImpl userService;
 
+    @Resource
+    private RedisTemplate<String,Object> redisTemplate;
     /**
      * 用户注册接口
      *
@@ -148,7 +151,6 @@ public class userController {
         User loginUser = userService.getLoginUser(request);
         //从缓存中读取数据
         String redisKey = String.format("friendsGathering:user:recommend:%s",loginUser.getId());
-        RedisTemplate<String,Object> redisTemplate = new RedisTemplate<>();
         ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
         Page<User> page = (Page<User>) valueOperations.get(redisKey);
         if(page!=null){
