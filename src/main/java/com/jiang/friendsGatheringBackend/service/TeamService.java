@@ -3,6 +3,10 @@ package com.jiang.friendsGatheringBackend.service;
 import com.jiang.friendsGatheringBackend.model.domain.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.jiang.friendsGatheringBackend.model.domain.User;
+import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
+import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
+
+import java.util.List;
 
 /**
 * @author jiang
@@ -18,4 +22,13 @@ public interface TeamService extends IService<Team> {
      * @param loginUser
      */
     long createTeam(Team team, User loginUser);
+
+    /**
+     * 查询队伍
+     *
+     * @param teamQuery
+     * @param isAdmin
+     * @return
+     */
+    List<TeamUserVO> listTeams(TeamQuery teamQuery, boolean isAdmin);
 }
