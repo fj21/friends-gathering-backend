@@ -10,6 +10,7 @@ import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.domain.UserTeam;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
 import com.jiang.friendsGatheringBackend.model.request.TeamAddRequest;
+import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
 import com.jiang.friendsGatheringBackend.service.UserService;
@@ -61,6 +62,12 @@ public class TeamController {
         return ResultUtils.success(teamId);
     }
 
+    /**
+     * 查询队伍接口，返回符合查询条件的队伍列表
+     * @param teamQuery
+     * @param request
+     * @return
+     */
     @PostMapping("/list")
     public BaseResponse<List<TeamUserVO>> queryTeams(TeamQuery teamQuery,HttpServletRequest request){
         if(teamQuery==null){
@@ -100,4 +107,23 @@ public class TeamController {
         });
         return ResultUtils.success(teamList);
     }
+
+
+    @PostMapping("/update")
+    public BaseResponse<Boolean> updateTeam(@RequestBody TeamUpdateRequest teamUpdateRequest, HttpServletRequest request){
+        //1.判断请求参数是否为空
+        if(teamUpdateRequest == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"您提供的修改请求为空");
+        }
+
+        User loginUser = userService.getLoginUser(request);
+        boolean result = teamService.updateTeam(teamUpdateRequest, loginUser);
+        if(!result){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"更新失败");
+        }
+        return ResultUtils.success(result);
+    }
+
+
+
 }

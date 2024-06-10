@@ -10,6 +10,7 @@ import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.domain.UserTeam;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
 import com.jiang.friendsGatheringBackend.model.enums.TeamStatusEnum;
+import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.model.vo.UserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
@@ -19,10 +20,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
 * @author jiang
@@ -186,7 +184,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             BeanUtils.copyProperties(team,teamUserVO);
             queryedTeamUserVOList.add(teamUserVO);
         });
-        //3.关联查询创建人的用户信息
+        //3.关联查询创建人的用户信息 TODO 在userService 新建一个getLoginUser(userId)方法优化
         QueryWrapper userWrapper = new QueryWrapper();
         queryedTeamUserVOList.stream().forEach(teamUserVO -> {
             Long userId = teamUserVO.getUserId();
@@ -199,6 +197,50 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
 
         return queryedTeamUserVOList;
+    }
+
+    /**
+     * 更新队伍
+     *
+     * @param teamUpdateRequest
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public boolean updateTeam(TeamUpdateRequest teamUpdateRequest, User loginUser) {
+        //1.判断请求参数是否为空
+        if(teamUpdateRequest == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"您提供的修改请求为空");
+        }
+        //2.查询队伍是否存在
+        Long id = teamUpdateRequest.getId();
+        if(id==null||id<=0){
+            throw new BusinessException(ErrorCode.NULL_ERROR,"您想要修改的队伍不存在");
+        }
+        Team oldTeam = this.getById(id);
+        if(oldTeam == null){
+            throw new BusinessException(ErrorCode.NULL_ERROR,"您想要修改的队伍不存在");
+        }
+        //3.只有管理员或者队伍的创建者可以修改
+        boolean isAdmin = userService.isAdmin(loginUser);
+        if(!isAdmin && !oldTeam.getUserId().equals(loginUser.getId())){
+            throw new BusinessException(ErrorCode.NO_AUTH,"您没有权限修改此队伍信息");
+        }
+        //4.如果队伍状态改为加密，必须要有密码
+        TeamStatusEnum enumByValue = TeamStatusEnum.getEnumByValue(teamUpdateRequest.getStatus());
+        if(TeamStatusEnum.SECRET.equals(enumByValue)){
+            String password = teamUpdateRequest.getPassword();
+            if(StringUtils.isBlank(password)){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR,"加密房间必须提供密码");
+            }
+        }
+        //5.更新队伍
+        Team newTeam = new Team();
+        BeanUtils.copyProperties(teamUpdateRequest,newTeam);
+        //这里如果newTeam中有字段是null，我们不希望其覆盖oldTeam中非null的字段
+        //所以就用updateById默认的更新策略not_null就好，不会将newTeam中为null的属性更新到oldTeam中
+        boolean isUpdated = this.updateById(newTeam);
+        return isUpdated;
     }
 }
 
