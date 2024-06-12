@@ -7,6 +7,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 创建队伍请求体
+ */
 @Data
 public class TeamAddRequest implements Serializable {
 

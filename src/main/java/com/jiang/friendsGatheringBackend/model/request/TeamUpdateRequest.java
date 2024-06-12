@@ -9,6 +9,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.io.Serializable;
 import java.util.Date;
 
+/**
+ * 更新队伍请求体
+ */
 @Data
 public class TeamUpdateRequest implements Serializable {
     private static final long serialVersionUID = 1L;

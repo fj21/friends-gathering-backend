@@ -1,4 +1,5 @@
 package com.jiang.friendsGatheringBackend.service.impl;
+import java.util.Date;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
@@ -10,17 +11,24 @@ import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.domain.UserTeam;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
 import com.jiang.friendsGatheringBackend.model.enums.TeamStatusEnum;
+import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.model.vo.UserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
 import com.jiang.friendsGatheringBackend.mapper.TeamMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
 * @author jiang
@@ -40,6 +48,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     @Resource
     private TeamService teamService;
 
+    @Resource
+    private RedissonClient redissonClient;
 
     /**
      * 创建队伍
@@ -241,6 +251,125 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         //所以就用updateById默认的更新策略not_null就好，不会将newTeam中为null的属性更新到oldTeam中
         boolean isUpdated = this.updateById(newTeam);
         return isUpdated;
+    }
+
+    /**
+     * 用户加入队伍
+     * @param teamJoinRequest
+     * @param request
+     * @return
+     */
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request) {
+        //1.校验非空
+        if(teamJoinRequest == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求体不能为空");
+        }
+        User loginUser = userService.getLoginUser(request);
+        Long userId = loginUser.getId();
+        Long teamId = teamJoinRequest.getTeamId();
+        Team team =  getTeamById(teamId);
+        Date expireTime = team.getExpireTime();
+
+        //如果队伍已经过期，则不能加入
+        if(expireTime!=null && expireTime.before(new Date())){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已经过期");
+        }
+        //4.禁止加入私有的队伍
+        TeamStatusEnum enumByValue = TeamStatusEnum.getEnumByValue(team.getStatus());
+        if(TeamStatusEnum.PRIVATE.equals(enumByValue)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"不能加入私有的队伍");
+        }
+        //5.如果加入的队伍是加密的,必须密码匹配才可以
+        if(TeamStatusEnum.SECRET.equals(enumByValue)){
+            String inputPassword = teamJoinRequest.getPassword();
+            if(StringUtils.isBlank(inputPassword)){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已加密，密码不能为空");
+            }
+            // TODO 如果队伍需要加密，需要将密码加密存储在数据库中，比对密码时也需要先将密码加密再比对
+            if(!inputPassword.equals(team.getPassword())){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR,"密码不正确");
+            }
+        }
+        //加分布式锁，用户在加入队伍前必须先获得锁
+        RLock lock = redissonClient.getLock("friendsGathering:join_team");
+        try {
+            //尝试去获取锁
+            while (true){
+                if(lock.tryLock(0,-1,TimeUnit.MILLISECONDS)){
+                    //用户最多加入5个队伍（包含创建的队伍）
+                    QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
+                    userTeamWrapper.eq("userId",userId);
+                    long count = userTeamService.count(userTeamWrapper);
+                    if(count>=5){
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户最多加入5个队伍");
+                    }
+
+
+                    //2.队伍必须存在，只能加入未满队伍
+                    Integer maxNum = team.getMaxNum();
+                    //获取要加入的队伍的当前人数
+                    long numInthisTeam = getNumInthisTeamByTeamId(teamId);
+                    userTeamWrapper = new QueryWrapper<>();
+                    //如果队伍已满,则不能加入
+                    if(numInthisTeam>=maxNum){
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已满");
+                    }
+
+                    //不能加入自己的队伍
+                    if(team.getUserId().equals(userId)){
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR,"不能加入自己的队伍");
+                    }
+                    //不能重复加入已加入的队伍
+                    //获取当前用户已加入过的队伍的队伍列表
+                    userTeamWrapper = new QueryWrapper<>();
+                    userTeamWrapper.eq("userId",userId);
+                    List<UserTeam> userHasJoinTeamList = userTeamService.list(userTeamWrapper);
+                    Set<Long> userHasJoinTeamIdSet = userHasJoinTeamList.stream()
+                            .map(userTeam -> {
+                                return userTeam.getTeamId();
+                            }).collect(Collectors.toSet());
+                    if(userHasJoinTeamIdSet.contains(teamId)){
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR,"不能重复加入已经加入过的队伍");
+                    }
+
+                    //6.新增 队伍-用户 关联信息，需要给方法加上事务注解
+                    UserTeam userTeam = new UserTeam();
+                    userTeam.setUserId(userId);
+                    userTeam.setTeamId(teamId);
+                    userTeam.setJoinTime(new Date());
+                    boolean isSaved = userTeamService.save(userTeam);
+                    return isSaved;
+                }
+            }
+        } catch (InterruptedException e) {
+            log.error("join team faild",e);
+            return false;
+        } finally {
+            if(lock.isHeldByCurrentThread()){
+                System.out.println("unlock"+Thread.currentThread().getId());
+                lock.unlock();
+            }
+        }
+    }
+
+    private long getNumInthisTeamByTeamId(Long teamId) {
+        QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
+        userTeamWrapper.eq("teamId", teamId);
+        long numInthisTeam = userTeamService.count(userTeamWrapper);
+        return numInthisTeam;
+    }
+
+    private Team getTeamById(Long teamId) {
+        QueryWrapper<Team> teamWrapper = new QueryWrapper<>();
+        teamWrapper.eq("id", teamId);
+        List<Team> list = this.list(teamWrapper);
+        if(CollectionUtils.isEmpty(list)){
+            throw new BusinessException(ErrorCode.NULL_ERROR,"您要加入的队伍不存在");
+        }
+        return list.get(0);
     }
 }
 

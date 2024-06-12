@@ -4,9 +4,11 @@ import com.jiang.friendsGatheringBackend.model.domain.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
+import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -42,4 +44,11 @@ public interface TeamService extends IService<Team> {
      */
     boolean updateTeam(TeamUpdateRequest teamUpdateRequest, User loginUser);
 
+    /**
+     * 用户加入队伍
+     * @param teamJoinRequest
+     * @param request
+     * @return
+     */
+    Boolean joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request);
 }
