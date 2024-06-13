@@ -4,7 +4,9 @@ import com.jiang.friendsGatheringBackend.model.domain.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
+import com.jiang.friendsGatheringBackend.model.request.TeamDeleteRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
+import com.jiang.friendsGatheringBackend.model.request.TeamQuitRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 
@@ -51,4 +53,21 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     Boolean joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request);
+
+    Boolean quitTeam(TeamQuitRequest teamQuitRequest,HttpServletRequest request);
+
+    /**
+     * 解散队伍
+     * @param teamDeleteRequest
+     * @param loginUser
+     * @return
+     */
+    Boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser);
+
+    /**
+     * 获取当前用户已加入的队伍
+     * @param loginUser
+     * @return
+     */
+    List<Team> listMyJoinTeams(User loginUser);
 }

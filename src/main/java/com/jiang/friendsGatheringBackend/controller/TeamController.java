@@ -9,15 +9,14 @@ import com.jiang.friendsGatheringBackend.model.domain.Team;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.domain.UserTeam;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
-import com.jiang.friendsGatheringBackend.model.request.TeamAddRequest;
-import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
-import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
+import com.jiang.friendsGatheringBackend.model.request.*;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
 import com.jiang.friendsGatheringBackend.service.UserService;
 import com.jiang.friendsGatheringBackend.service.UserTeamService;
 import com.jiang.friendsGatheringBackend.service.impl.UserTeamServiceImpl;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.domain.geo.RadiusShape;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -70,7 +69,7 @@ public class TeamController {
      * @return
      */
     @PostMapping("/list")
-    public BaseResponse<List<TeamUserVO>> queryTeams(TeamQuery teamQuery,HttpServletRequest request){
+    public BaseResponse<List<TeamUserVO>> queryTeams(@RequestBody TeamQuery teamQuery,HttpServletRequest request){
         if(teamQuery==null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"查询条件不能为空");
         }
@@ -131,15 +130,75 @@ public class TeamController {
         return ResultUtils.success(result);
     }
 
+    /**
+     * 加入队伍接口
+     * @param teamJoinRequest
+     * @param request
+     * @return
+     */
     @PostMapping("/join")
     public BaseResponse<Boolean> joinTeam(@RequestBody TeamJoinRequest teamJoinRequest,HttpServletRequest request){
         //1.判断请求体是否为空
         if(teamJoinRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数不能为空");
         }
-        teamService.joinTeam(teamJoinRequest,request)
+        Boolean result = teamService.joinTeam(teamJoinRequest, request);
+        if(result!=null && result){
+            return ResultUtils.success(result);
+        }
+        return ResultUtils.error(ErrorCode.SYSTEM_ERROR,"加入队伍失败");
+
     }
 
+    /**
+     * 退出队伍接口
+     * @param teamQuitRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/quit")
+    public BaseResponse<Boolean> quitTeam(TeamQuitRequest teamQuitRequest,HttpServletRequest request){
+        //1.判断请求体是否为空
+        if(teamQuitRequest==null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数不能为空");
+        }
+        Boolean result = teamService.quitTeam(teamQuitRequest, request);
+        if(result!=null && result){
+            return ResultUtils.success(result);
+        }
+        return ResultUtils.error(ErrorCode.SYSTEM_ERROR,"退出队伍失败");
+    }
+
+    /**
+     * 解散队伍
+     * @param teamDeleteRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/delete")
+    public BaseResponse<Boolean> deleteTeam(@RequestBody TeamDeleteRequest teamDeleteRequest,HttpServletRequest request){
+        //1.校验请求参数
+        if(teamDeleteRequest == null){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数为空");
+        }
+        User loginUser = userService.getLoginUser(request);
+        Boolean result = teamService.deleteTeam(teamDeleteRequest, loginUser);
+        if(!result){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"删除队伍失败");
+        }
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 获取我加入的队伍
+     * @param request
+     * @return
+     */
+//    @PostMapping("/list/my/join")
+//    public BaseResponse<List<Team>> listMyJoinTeam(HttpServletRequest request){
+//        User loginUser = userService.getLoginUser(request);
+//        teamService.listMyJoinTeams(loginUser)
+//    }
 
 
 }
