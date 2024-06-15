@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/users")
 @RestController
 public class userController {
-    @Autowired
+    @Resource
     private UserServiceImpl userService;
 
     @Resource
@@ -133,6 +133,9 @@ public class userController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         List<User> userList = userService.searchUsersByTags(tagNameList);
+        if(CollectionUtils.isEmpty(userList)){
+            throw new BusinessException(ErrorCode.NULL_ERROR,"没有符合条件的队伍");
+        }
         return ResultUtils.success(userList);
     }
 
@@ -164,6 +167,19 @@ public class userController {
         return ResultUtils.success(userPage);
     }
 
-
+    /**
+     * 匹配用户
+     * @param num
+     * @param request
+     * @return
+     */
+    @GetMapping("/match")
+    public BaseResponse<List<User>> matchUser(long num,HttpServletRequest request){
+        if(num<0||num>20){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配人数不能超过20人，也不能为空");
+        }
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(userService.matchUser(num,loginUser));
+    }
 
 }

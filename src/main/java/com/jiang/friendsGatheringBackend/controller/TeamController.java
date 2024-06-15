@@ -17,10 +17,7 @@ import com.jiang.friendsGatheringBackend.service.UserTeamService;
 import com.jiang.friendsGatheringBackend.service.impl.UserTeamServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.domain.geo.RadiusShape;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -194,11 +191,35 @@ public class TeamController {
      * @param request
      * @return
      */
-//    @PostMapping("/list/my/join")
-//    public BaseResponse<List<Team>> listMyJoinTeam(HttpServletRequest request){
-//        User loginUser = userService.getLoginUser(request);
-//        teamService.listMyJoinTeams(loginUser)
-//    }
+    @GetMapping("/list/my/join")
+    public BaseResponse<List<TeamUserVO>> listMyJoinTeam(TeamQuery teamQuery, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        Long userId = loginUser.getId();
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        userTeamQueryWrapper.eq("userId",userId);
+        List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+        List<Long> teamIdList = userTeamList.stream().map(UserTeam::getTeamId).toList();
+        teamQuery.setIdList(teamIdList);
+        List<TeamUserVO> teamUserVOS = teamService.listTeams(teamQuery, true);
+        return ResultUtils.success(teamUserVOS);
+    }
 
-
+    /**
+     * 获取我创建的队伍
+     * @param teamQuery
+     * @param request
+     * @return
+     */
+    @GetMapping("/list/my/create")
+    public BaseResponse<List<TeamUserVO>> listMyCreateTeam(TeamQuery teamQuery,HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        Long userId = loginUser.getId();
+        QueryWrapper<Team> teamWrapper = new QueryWrapper<>();
+        teamWrapper.eq("userId",userId);
+        List<Team> teamList = teamService.list(teamWrapper);
+        List<Long> idList = teamList.stream().map(Team::getId).toList();
+        teamQuery.setIdList(idList);
+        List<TeamUserVO> teamUserVOS = teamService.listTeams(teamQuery, true);
+        return ResultUtils.success(teamUserVOS);
+    }
 }

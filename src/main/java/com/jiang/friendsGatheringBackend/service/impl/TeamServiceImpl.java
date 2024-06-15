@@ -47,8 +47,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     @Resource
     private UserServiceImpl userService;
 
-    @Resource
-    private TeamService teamService;
 
     @Resource
     private RedissonClient redissonClient;
@@ -189,7 +187,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //2.不展示已经过期的队伍
         teamWrapper.gt("expireTime",new Date());
-        List<Team> queryedTeamList = teamService.list(teamWrapper);
+        List<Team> queryedTeamList = this.list(teamWrapper);
         List<TeamUserVO> queryedTeamUserVOList = new ArrayList<>();
         queryedTeamList.stream().forEach(team -> {
             TeamUserVO teamUserVO = new TeamUserVO();
@@ -249,6 +247,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         //5.更新队伍
         Team newTeam = new Team();
         BeanUtils.copyProperties(teamUpdateRequest,newTeam);
+
         //这里如果newTeam中有字段是null，我们不希望其覆盖oldTeam中非null的字段
         //所以就用updateById默认的更新策略not_null就好，不会将newTeam中为null的属性更新到oldTeam中
         boolean isUpdated = this.updateById(newTeam);
@@ -395,7 +394,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //4. 还有其他人
         //   1. 如果是队长退出队伍，权限转移给第二早加入的用户 -- 先来后到（只用取 id 最小的两条数据）
-        if(team.getUserId()==userId){
+        if(team.getUserId().equals(userId)){
             QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
             userTeamWrapper.eq("teamId", teamId);
             List<UserTeam> userTeamList = userTeamService.list(userTeamWrapper);
@@ -440,7 +439,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.NULL_ERROR,"您要加入的队伍不存在或已删除");
         }
         //3. 校验当前用户是不是队伍的队长
-        if(team.getUserId()!=loginUser.getId()){
+        if(!team.getUserId().equals(loginUser.getId())){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"操作失败,您不是当前队伍的队长");
         }
         //4. 移除所有加入队伍的关联信息

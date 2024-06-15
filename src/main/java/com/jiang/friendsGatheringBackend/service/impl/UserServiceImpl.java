@@ -10,18 +10,19 @@ import com.jiang.friendsGatheringBackend.mapper.UserMapper;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.service.UserService;
 
+
+import com.jiang.friendsGatheringBackend.util.AlgrithomUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -179,6 +180,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setUpdateTime(originUser.getUpdateTime());
         safetyUser.setUserRole(originUser.getUserRole());
         safetyUser.setPlanetCode(originUser.getPlanetCode());
+        safetyUser.setTags(originUser.getTags());
         return safetyUser;
     }
 
@@ -225,17 +227,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         List<User> userList = this.list(queryWrapper);
         Gson gson = new Gson();
-        return userList.stream().filter(user -> {
+        List<User> list = userList.stream().filter(user -> {
             String tagsStr = user.getTags();
-            Set<String> tempTagnameSet = gson.fromJson(tagsStr,new TypeToken<>(){}.getType());
+            Set<String> tempTagnameSet = gson.fromJson(tagsStr, new TypeToken<>() {
+            }.getType());
             tempTagnameSet = Optional.ofNullable(tempTagnameSet).orElse(new HashSet<>());
-            for(String tagName:tagsNameList){
-                if(!tempTagnameSet.contains(tagName)){
+            for (String tagName : tagsNameList) {
+                if (!tempTagnameSet.contains(tagName)) {
                     return false;
                 }
             }
             return true;
         }).map(this::getSafetyUser).collect(Collectors.toList());
+        return list;
     }
 
     /**
@@ -264,6 +268,69 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
 
         return (User) userObj;
+    }
+
+    /**
+     * 匹配用户
+     * @param num
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public List<User> matchUser(long num, User loginUser) {
+        //1. 校验参数
+        if(num<0||num>20){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配人数不能超过20人，也不能为空");
+        }
+        //2. 得到当前登录用户的 tagNameList
+        String tags = loginUser.getTags();
+        Gson gson = new Gson();
+        List<String> tagNameList = gson.fromJson(tags, new TypeToken<List<String>>() {
+        }.getType());
+        //3. 从数据库中获取所有用户的 tagNameList
+        //   1. （除了当前用户自身）
+        QueryWrapper<User> userWrapper = new QueryWrapper<>();
+        userWrapper.select("id","tags");
+        userWrapper.isNotNull("tags");
+        List<User> userList = this.list(userWrapper);
+
+        //   2. 并将所有用户的 tagNameList 与当前用户的 tagNameList 进行比较，得到一个分值。
+        // 用户（只包括 id,tags） ===> 相似度
+        List<Pair<User,Long>> list = new ArrayList<>();
+        for(int i=0;i<userList.size();i++){
+            User user = userList.get(i);
+            String userTags = user.getTags();
+            //标签为空或者是当前用户则跳过
+            if("[]".equals(userTags)||StringUtils.isBlank(userTags)||loginUser.getId().equals(user.getId())){
+                continue;
+            }
+            List<String> curUserTagNameList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+            }.getType());
+            long score = AlgrithomUtils.minDistance(tagNameList, curUserTagNameList);
+            list.add(Pair.of(user,score));
+        }
+        //4. 按照编辑距离由小到大排序
+        List<Pair<User, Long>> topUserList = list.stream()
+                .sorted((a, b) -> (int) (a.getSecond() - b.getSecond()))
+                .limit(num)
+                .toList();
+        //5. 得到一个 TOP 用户 idList
+        List<Long> toReturnIdList = topUserList.stream()
+                .map(pair -> {
+                    return pair.getFirst().getId();
+                })
+                .collect(Collectors.toList());
+        //6. 通过用户 Id 得到用户，将用户列表返回。
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.in("id",toReturnIdList);
+        Map<Long, List<User>> topUserIdToSafetyUserMap = this.list(userQueryWrapper).stream()
+                .map(user-> getSafetyUser(user))
+                .collect(Collectors.groupingBy(user->user.getId()));
+        List<User> finalInoderReturnUserList = new ArrayList<>();
+        for(int i=0;i<toReturnIdList.size();i++){
+            finalInoderReturnUserList.add(topUserIdToSafetyUserMap.get(toReturnIdList.get(i)).get(0));
+        }
+        return finalInoderReturnUserList;
     }
 }
 

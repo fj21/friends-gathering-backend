@@ -54,7 +54,7 @@ public interface TeamService extends IService<Team> {
      */
     Boolean joinTeam(TeamJoinRequest teamJoinRequest, HttpServletRequest request);
 
-    Boolean quitTeam(TeamQuitRequest teamQuitRequest,HttpServletRequest request);
+    Boolean quitTeam(TeamQuitRequest teamQuitRequest, HttpServletRequest request);
 
     /**
      * 解散队伍
