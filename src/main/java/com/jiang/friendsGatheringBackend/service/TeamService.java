@@ -8,6 +8,7 @@ import com.jiang.friendsGatheringBackend.model.request.TeamDeleteRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamQuitRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 
 import javax.servlet.http.HttpServletRequest;
@@ -26,7 +27,7 @@ public interface TeamService extends IService<Team> {
      * @param team
      * @param loginUser
      */
-    long createTeam(Team team, User loginUser);
+    long createTeam(Team team, SessionData loginUser);
 
     /**
      * 查询队伍
@@ -44,7 +45,7 @@ public interface TeamService extends IService<Team> {
      * @param loginUser
      * @return
      */
-    boolean updateTeam(TeamUpdateRequest teamUpdateRequest, User loginUser);
+    boolean updateTeam(TeamUpdateRequest teamUpdateRequest, SessionData loginUser);
 
     /**
      * 用户加入队伍
@@ -62,12 +63,12 @@ public interface TeamService extends IService<Team> {
      * @param loginUser
      * @return
      */
-    Boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser);
+    Boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, SessionData loginUser);
 
     /**
      * 获取当前用户已加入的队伍
      * @param loginUser
      * @return
      */
-    List<Team> listMyJoinTeams(User loginUser);
+    List<Team> listMyJoinTeams(SessionData loginUser);
 }

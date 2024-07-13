@@ -15,6 +15,7 @@ import com.jiang.friendsGatheringBackend.model.request.TeamDeleteRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamJoinRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamQuitRequest;
 import com.jiang.friendsGatheringBackend.model.request.TeamUpdateRequest;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.model.vo.UserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
@@ -58,7 +59,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * @param loginUser
      */
     @Override
-    public long createTeam(Team team, User loginUser) {
+    public long createTeam(Team team, SessionData loginUser) {
         //1. 请求参数是否为空？
         if(team==null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数为空");
@@ -100,7 +101,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"超时时间设置不正确");
         }
         //   7. 校验用户最多创建 5 个队伍
-        Long createrUserId = loginUser.getId();
+        Long createrUserId = Long.valueOf(loginUser.getUserId());
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userId",createrUserId);
         long count = this.count(queryWrapper);
@@ -217,7 +218,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * @return
      */
     @Override
-    public boolean updateTeam(TeamUpdateRequest teamUpdateRequest, User loginUser) {
+    public boolean updateTeam(TeamUpdateRequest teamUpdateRequest, SessionData loginUser) {
         //1.判断请求参数是否为空
         if(teamUpdateRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"您提供的修改请求为空");
@@ -233,7 +234,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //3.只有管理员或者队伍的创建者可以修改
         boolean isAdmin = userService.isAdmin(loginUser);
-        if(!isAdmin && !oldTeam.getUserId().equals(loginUser.getId())){
+        if(!isAdmin && !oldTeam.getUserId().equals(Long.valueOf(loginUser.getUserId()))){
             throw new BusinessException(ErrorCode.NO_AUTH,"您没有权限修改此队伍信息");
         }
         //4.如果队伍状态改为加密，必须要有密码
@@ -268,8 +269,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         if(teamJoinRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求体不能为空");
         }
-        User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
+        SessionData loginUser = userService.getLoginUser(request);
+        String userId = loginUser.getUserId();
         Long teamId = teamJoinRequest.getTeamId();
         Team team =  getTeamById(teamId);
         Date expireTime = team.getExpireTime();
@@ -295,11 +296,11 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             }
         }
         //加分布式锁，用户在加入队伍前必须先获得锁
-        RLock lock = redissonClient.getLock("friendsGathering:join_team");
+        RLock lock = redissonClient.getLock("friendsGathering:join_team"+String.valueOf(teamId));
         try {
             //尝试去获取锁
             while (true){
-                if(lock.tryLock(0,-1,TimeUnit.MILLISECONDS)){
+                if(lock.tryLock(500,10000,TimeUnit.MILLISECONDS)){
                     //用户最多加入5个队伍（包含创建的队伍）
                     QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
                     userTeamWrapper.eq("userId",userId);
@@ -307,8 +308,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
                     if(count>=5){
                         throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户最多加入5个队伍");
                     }
-
-
                     //2.队伍必须存在，只能加入未满队伍
                     Integer maxNum = team.getMaxNum();
                     //获取要加入的队伍的当前人数
@@ -318,9 +317,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
                     if(numInthisTeam>=maxNum){
                         throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍已满");
                     }
-
                     //不能加入自己的队伍
-                    if(team.getUserId().equals(userId)){
+                    if(team.getUserId().equals(Long.valueOf(userId))){
                         throw new BusinessException(ErrorCode.PARAMS_ERROR,"不能加入自己的队伍");
                     }
                     //不能重复加入已加入的队伍
@@ -338,7 +336,14 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
                     //6.新增 队伍-用户 关联信息，需要给方法加上事务注解
                     UserTeam userTeam = new UserTeam();
-                    userTeam.setUserId(userId);
+                    try {
+                        Long longValue = Long.parseLong(userId);
+                        userTeam.setUserId(longValue);
+                        // 使用 longValue
+                    } catch (NumberFormatException e) {
+                        // 处理转换异常
+                        e.printStackTrace();
+                    }
                     userTeam.setTeamId(teamId);
                     userTeam.setJoinTime(new Date());
                     boolean isSaved = userTeamService.save(userTeam);
@@ -375,10 +380,17 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.NULL_ERROR,"您想要退出的队伍不存在");
         }
         //2. 校验我是否已加入队伍
-        User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
-        if(!isInTeam(userId, teamId)){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"您未加入此队伍");
+        SessionData loginUser = userService.getLoginUser(request);
+        String userId = loginUser.getUserId();
+        try {
+            Long longValue = Long.parseLong(userId);
+            if(!isInTeam(longValue, teamId)){
+                throw new BusinessException(ErrorCode.PARAMS_ERROR,"您未加入此队伍");
+            }
+            // 使用 longValue
+        } catch (NumberFormatException e) {
+            // 处理转换异常
+            e.printStackTrace();
         }
         //3. 如果 队伍只剩一人，队伍解散
         long numInthisTeamByTeamId = getNumInthisTeamByTeamId(teamId);
@@ -394,7 +406,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //4. 还有其他人
         //   1. 如果是队长退出队伍，权限转移给第二早加入的用户 -- 先来后到（只用取 id 最小的两条数据）
-        if(team.getUserId().equals(userId)){
+        Long longUserId = Long.valueOf(userId);
+        if(team.getUserId().equals(longUserId)){
             QueryWrapper<UserTeam> userTeamWrapper = new QueryWrapper<>();
             userTeamWrapper.eq("teamId", teamId);
             List<UserTeam> userTeamList = userTeamService.list(userTeamWrapper);
@@ -427,7 +440,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, User loginUser) {
+    public Boolean deleteTeam(TeamDeleteRequest teamDeleteRequest, SessionData loginUser) {
         //1. 校验请求参数
         if(teamDeleteRequest==null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数不能为空");
@@ -439,7 +452,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.NULL_ERROR,"您要加入的队伍不存在或已删除");
         }
         //3. 校验当前用户是不是队伍的队长
-        if(!team.getUserId().equals(loginUser.getId())){
+        if(!team.getUserId().equals(Long.valueOf(loginUser.getUserId()))){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"操作失败,您不是当前队伍的队长");
         }
         //4. 移除所有加入队伍的关联信息
@@ -455,12 +468,12 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     }
 
     @Override
-    public List<Team> listMyJoinTeams(User loginUser) {
+    public List<Team> listMyJoinTeams(SessionData loginUser) {
         //1.校验参数
         if(loginUser == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"未登录");
         }
-        Long userId = loginUser.getId();
+        Long userId = Long.valueOf(loginUser.getUserId());
         QueryWrapper<Team> teamWrapper = new QueryWrapper<>();
         teamWrapper.eq("userId",userId);
 

@@ -1,7 +1,9 @@
 package com.jiang.friendsGatheringBackend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
 
 
 import javax.servlet.http.HttpServletRequest;
@@ -34,7 +36,7 @@ public interface UserService extends IService<User> {
      * @param request   http请求
      * @return 脱敏后的用户信息
      */
-    User userLogin(String userAccount, String password, HttpServletRequest request);
+    String userLogin(String userAccount, String password, HttpServletRequest request) throws JsonProcessingException;
 
     /**
      * 用户脱敏
@@ -58,7 +60,7 @@ public interface UserService extends IService<User> {
      * @param loginUser
      * @return
      */
-    boolean isAdmin(User loginUser);
+    boolean isAdmin(SessionData loginUser);
 
     /**
      * 根据标签搜索用户
@@ -81,7 +83,7 @@ public interface UserService extends IService<User> {
      * @param request
      * @return
      */
-    User getLoginUser(HttpServletRequest request);
+    SessionData getLoginUser(HttpServletRequest request);
 
     /**
      * 匹配用户
@@ -89,5 +91,7 @@ public interface UserService extends IService<User> {
      * @param loginUser
      * @return
      */
-    List<User> matchUser(long num, User loginUser);
+    List<User> matchUser(long num, SessionData loginUser);
+
+    void saveUserTags(String tagsJsonString,HttpServletRequest request);
 }

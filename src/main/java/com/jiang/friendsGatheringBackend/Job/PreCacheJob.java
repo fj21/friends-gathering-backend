@@ -45,13 +45,13 @@ public class PreCacheJob {
         RLock lock = redissonClient.getLock("friendGathering:PreCacheJob:doCache:lock");
         try {
             //只有一个线程能获取锁
-            if(lock.tryLock(0,-1, TimeUnit.MILLISECONDS)){
+            if(lock.tryLock(0,10, TimeUnit.SECONDS)){
                 System.out.println("getLock"+Thread.currentThread().getId());
                 ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
                 for(Long userId: mainUserIdList){
                     String redisKey = String.format("friendsGathering:user:recommend:%s", userId);
                     QueryWrapper<User> userWrapper = new QueryWrapper<>();
-                    Page<User> userPage = userService.page(new Page<>(2,10), userWrapper);
+                    Page<User> userPage = getUsersForRecommendation(userId);
                     try {
                         valueOperations.set(redisKey,userPage,24,TimeUnit.HOURS);
                     }catch (Exception e){
@@ -68,5 +68,11 @@ public class PreCacheJob {
                 lock.unlock();
             }
         }
+    }
+
+    private Page<User> getUsersForRecommendation(Long userId) {
+        QueryWrapper<User> userWrapper = new QueryWrapper<>();
+        Page<User> userPage = userService.page(new Page<>(2, 10), userWrapper);
+        return userPage;
     }
 }

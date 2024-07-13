@@ -1,6 +1,6 @@
 spring:
-  profiles:
-    active: dev
+#  profiles:
+#    active: dev
   application:
     name: friends-gathering-backend
   datasource:
@@ -12,10 +12,10 @@ spring:
     pathmatch:
       #Springfox使用的路径匹配是基于AntPathMatcher的，而Spring Boot 2.6.X使用的是PathPatternMatcher 解决knife4j匹配boot2.6.4 boot版本过高的问题
       matching-strategy: ant_path_matcher
-  # session 的存储方式改为redis，失效时间（分钟）
+  # session 的存储方式改为redis，失效时间（秒）
   session:
     store-type: redis
-    timeout: 86400
+    timeout: 600
 #  # redis 配置
   redis:
     host: localhost
@@ -32,20 +32,20 @@ mybatis-plus:
       logic-delete-value: 1 # 逻辑已删除值(默认为 1)
       logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
 
-#  # springdoc-openapi项目配置
-#  springdoc:
-#    swagger-ui:
-#      path: /swagger-ui.html
-#      tags-sorter: alpha
-#      operations-sorter: alpha
-#    api-docs:
-#      path: /v3/api-docs
-#    group-configs:
-#      - group: 'default'
-#        paths-to-match: '/**'
-#        packages-to-scan: com.jiang.friendsGatheringBackend.controller
-#  # knife4j的增强配置，不需要增强可以不配
-#  knife4j:
-#    enable: true
-#    setting:
-#      language: zh_cn
+  # springdoc-openapi项目配置
+  springdoc:
+    swagger-ui:
+      path: /swagger-ui.html
+      tags-sorter: alpha
+      operations-sorter: alpha
+    api-docs:
+      path: /v3/api-docs
+    group-configs:
+      - group: 'default'
+        paths-to-match: '/**'
+        packages-to-scan: com.jiang.friendsGatheringBackend.controller
+  # knife4j的增强配置，不需要增强可以不配
+  knife4j:
+    enable: true
+    setting:
+      language: zh_cn

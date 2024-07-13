@@ -38,10 +38,6 @@ public class TeamAddRequest implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date expireTime;
 
-    /**
-     * 用户id
-     */
-    private Long userId;
 
     /**
      * 0 - 公开，1 - 私有，2 - 加密

@@ -2,6 +2,7 @@ package com.jiang.friendsGatheringBackend.exception;
 
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ser.Serializers;
 import com.jiang.friendsGatheringBackend.common.BaseResponse;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
@@ -25,5 +26,10 @@ public class GlobalExceptionHandler {
         log.error("runtimeException:",e);
         return ResultUtils.error(ErrorCode.SYSTEM_ERROR,e.getMessage(),"");
     }
-
+//JsonProcessingException
+    @ExceptionHandler(JsonProcessingException.class)
+    public BaseResponse JsonProcessingExceptionHandler(JsonProcessingException e){
+        log.error("JsonProcessingException:",e);
+        return ResultUtils.error(ErrorCode.SYSTEM_ERROR,e.getMessage(),"");
+    }
 }

@@ -2,12 +2,17 @@ package com.jiang.friendsGatheringBackend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.jiang.friendsGatheringBackend.Manager.RedisSessionManager;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
 import com.jiang.friendsGatheringBackend.exception.BusinessException;
 import com.jiang.friendsGatheringBackend.mapper.UserMapper;
 import com.jiang.friendsGatheringBackend.model.domain.User;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
 import com.jiang.friendsGatheringBackend.service.UserService;
 
 
@@ -22,6 +27,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -119,42 +125,82 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public User userLogin(String userAccount, String password, HttpServletRequest request) {
-        //1.校验用户账户和密码是否合法
-        if(StringUtils.isAnyBlank(userAccount,password)){
-            return null;
-        }
-        if(userAccount.length()<4){
-            return null;
-        }
-        if(password.length()<8){
-            return null;
-        }
-        //账户不能包含特殊字符
-        String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
-        Matcher matcher = Pattern.compile(validPattern).matcher(userAccount);
-        if(matcher.find()){
-            return null;
-        }
-        //2.加密
-        String encryptedPassword = DigestUtils.md5DigestAsHex((SALT+password).getBytes());
-        //查询数据库，校验密码是否正确
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("userPassword",encryptedPassword);
-        queryWrapper.eq("userAccount",userAccount);
-        User user = userMapper.selectOne(queryWrapper);
-        //用户不存在
-        if(user==null){
-            log.info("userLogin failed,userAccount can not match userPassword");
-            return null;
-        }
-        //3.用户脱敏
-        User safetyUser = getSafetyUser(user);
-        //4.记录用户的登录态
-        request.getSession().setAttribute(USER_LOGIN_STATE,safetyUser);
+    public String userLogin(String userAccount, String password, HttpServletRequest request) throws JsonProcessingException {
 
-        return safetyUser;
+        // 假设这里有一个验证用户名和密码的逻辑
+        User isAuthenticated = authenticate(userAccount, password);
+        if (isAuthenticated!=null) {
+            // 生成一个唯一的 sessionId
+            String sessionId = generateSessionId();
+            //3.用户脱敏
+            User safetyUser = getSafetyUser(isAuthenticated);
+
+            // 假设这里有一个获取用户信息的逻辑，构建 SessionData 对象
+            //4.记录用户的登录态
+//            HttpSession session = request.getSession();
+//            String sessionId = session.getId();
+            RedisSessionManager redisSessionManager =  new RedisSessionManager();
+            SessionData sessionData = new SessionData();
+            sessionData.setUserName(safetyUser.getUsername());
+            sessionData.setUserId(String.valueOf(safetyUser.getId()));
+            sessionData.setRole(safetyUser.getUserRole());
+            sessionData.setTags(safetyUser.getTags());
+            //redisSessionManager.saveSession(String.valueOf(safetyUser.getId()),sessionData);
+            try {
+                // 将 SessionData 存储到 Redis 中
+                redisSessionManager.saveSession(sessionId, sessionData);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+                redisSessionManager.close();
+                throw new BusinessException(ErrorCode.LOGIN_FAILED,"请稍后重新登录");
+                // 处理存储异常情况
+            }
+            return sessionId; // 返回 sessionId 给客户端
+        }
+        return null; // 登录失败，返回 null 或者其他错误信息
+
+
     }
+
+        private String generateSessionId() {
+            // 生成一个唯一的 sessionId，这里简单使用 UUID
+            return UUID.randomUUID().toString();
+        }
+        private User authenticate(String userAccount, String password) {
+            //1.校验用户账户和密码是否合法
+            if(StringUtils.isAnyBlank(userAccount,password)){
+                return null;
+            }
+            if(userAccount.length()<4){
+                return null;
+            }
+            if(password.length()<8){
+                return null;
+            }
+            //账户不能包含特殊字符
+            String validPattern = "[`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*（）——+|{}【】‘；：”“’。，、？]";
+            Matcher matcher = Pattern.compile(validPattern).matcher(userAccount);
+            if(matcher.find()){
+                return null;
+            }
+            //2.加密
+            String encryptedPassword = DigestUtils.md5DigestAsHex((SALT+password).getBytes());
+            //查询数据库，校验密码是否正确
+            QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("userPassword",encryptedPassword);
+            queryWrapper.eq("userAccount",userAccount);
+            User user = userMapper.selectOne(queryWrapper);
+            //用户不存在
+            if(user==null){
+                log.info("userLogin failed,userAccount can not match userPassword");
+                return null;
+            }
+
+            // 假设这里有验证用户名和密码的逻辑，例如从数据库中查询
+            // 实际中根据具体情况实现验证逻辑
+            // 返回验证结果
+            return user; // 这里暂时简单返回 true，实际中需根据用户名和密码进行验证
+        }
 
     /**
      * 用户脱敏
@@ -207,11 +253,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public boolean isAdmin(User loginUser) {
+    public boolean isAdmin(SessionData loginUser) {
         if(loginUser==null) {
             return false;
         }
-        return loginUser.getUserRole()==ADMIN_ROLE;
+        return loginUser.getRole()==ADMIN_ROLE;
     }
 
     /**
@@ -250,7 +296,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public int userLogout(HttpServletRequest request) {
-        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            String sessionId = authorizationHeader.substring(7); // 获取 sessionId 部分
+            RedisSessionManager redisSessionManager = new RedisSessionManager();
+            redisSessionManager.logout(sessionId);
+        }
         return 1;
     }
 
@@ -261,13 +312,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public User getLoginUser(HttpServletRequest request) {
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        if(userObj == null){
+    public SessionData getLoginUser(HttpServletRequest request) {
+
+        String authorizationHeader = request.getHeader("Authorization");
+        SessionData sessionData = null;
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            String sessionId = authorizationHeader.substring(7); // 获取 sessionId 部分
+            RedisSessionManager redisSessionManager = new RedisSessionManager();
+            try {
+                sessionData = redisSessionManager.getSession(sessionId);
+                if(sessionData==null){
+                    throw new BusinessException(ErrorCode.NO_AUTH,"未登录");
+                }
+                //当用户使用到登录功能后，更新其 redis 中 session 存储的时间
+                redisSessionManager.updateSessionExpiration(sessionId);
+
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        if(sessionData==null){
             throw new BusinessException(ErrorCode.NO_AUTH,"未登录");
         }
-
-        return (User) userObj;
+        return sessionData;
     }
 
     /**
@@ -277,7 +344,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public List<User> matchUser(long num, User loginUser) {
+    public List<User> matchUser(long num, SessionData loginUser) {
         //1. 校验参数
         if(num<0||num>20){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配人数不能超过20人，也不能为空");
@@ -287,6 +354,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         Gson gson = new Gson();
         List<String> tagNameList = gson.fromJson(tags, new TypeToken<List<String>>() {
         }.getType());
+        if(CollectionUtils.isEmpty(tagNameList)){
+            throw new BusinessException(ErrorCode.NULL_ERROR,"您的标签为空,匹配失败");
+        }
         //3. 从数据库中获取所有用户的 tagNameList
         //   1. （除了当前用户自身）
         QueryWrapper<User> userWrapper = new QueryWrapper<>();
@@ -301,7 +371,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             User user = userList.get(i);
             String userTags = user.getTags();
             //标签为空或者是当前用户则跳过
-            if("[]".equals(userTags)||StringUtils.isBlank(userTags)||loginUser.getId().equals(user.getId())){
+            if("[]".equals(userTags)||StringUtils.isBlank(userTags)||loginUser.getUserId().equals(user.getId())){
                 continue;
             }
             List<String> curUserTagNameList = gson.fromJson(userTags, new TypeToken<List<String>>() {
@@ -315,11 +385,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 .limit(num)
                 .toList();
         //5. 得到一个 TOP 用户 idList
-        List<Long> toReturnIdList = topUserList.stream()
-                .map(pair -> {
-                    return pair.getFirst().getId();
-                })
-                .collect(Collectors.toList());
+        List<Long> toReturnIdList = getMinNElements(topUserList,num);
         //6. 通过用户 Id 得到用户，将用户列表返回。
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         userQueryWrapper.in("id",toReturnIdList);
@@ -331,6 +397,70 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             finalInoderReturnUserList.add(topUserIdToSafetyUserMap.get(toReturnIdList.get(i)).get(0));
         }
         return finalInoderReturnUserList;
+    }
+    private List<Long> getMinNElements(List<Pair<User, Long>> userList, Long N) {
+        // 创建一个大顶堆优先队列，按照 Integer 升序排列
+        PriorityQueue<Pair<User, Long>> maxHeap = new PriorityQueue<>(N, (a, b) -> (b.getSecond() - a.getSecond()));
+
+        // 遍历 userList
+        for (Pair<User, Long> pair : userList) {
+            maxHeap.offer(pair); // 将元素加入大顶堆
+
+            // 如果大顶堆的大小超过了 N，移除堆顶元素（值最大的元素）
+            if (maxHeap.size() > N) {
+                maxHeap.poll();
+            }
+        }
+
+        // 从大顶堆中提取值最小的 N 个元素的用户 id
+        return maxHeap.stream()
+                .map(pair -> pair.getFirst().getId())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 用户上传标签
+     * @param tagsJsonString
+     */
+    @Override
+    public void saveUserTags(String tagsJsonString,HttpServletRequest request) {
+        String userId = getLoginUser(request).getUserId();
+        // 查询当前用户的标签信息
+        User user = userMapper.selectById(userId);
+
+        // 获取原有的标签字段
+        String originalTagsJsonString = user.getTags();
+        List<String> originalTags = new ArrayList<>();
+
+        // 如果原有标签字段不为空且不是空数组，则解析成列表
+        if (!StringUtils.isEmpty(originalTagsJsonString) && !"[]".equals(originalTagsJsonString)) {
+            try {
+                originalTags = new ObjectMapper().readValue(originalTagsJsonString, new TypeReference<List<String>>() {});
+            } catch (JsonProcessingException e) {
+                e.printStackTrace(); // 处理 JSON 解析异常
+            }
+        }
+
+        // 构建新的标签列表，将新上传的标签加入
+        List<String> updatedTags = new ArrayList<>(originalTags);
+        try {
+            List<String> newTags = new ObjectMapper().readValue(tagsJsonString, new TypeReference<List<String>>() {});
+            updatedTags.addAll(newTags);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace(); // 处理 JSON 解析异常
+        }
+
+        // 将更新后的标签列表转换为 JSON 字符串
+        String updatedTagsJsonString = "";
+        try {
+            updatedTagsJsonString = new ObjectMapper().writeValueAsString(updatedTags);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace(); // 处理 JSON 转换异常
+        }
+
+        // 更新用户的 tags 字段
+        user.setTags(updatedTagsJsonString);
+        userMapper.updateById(user); // 更新用户信息
     }
 }
 

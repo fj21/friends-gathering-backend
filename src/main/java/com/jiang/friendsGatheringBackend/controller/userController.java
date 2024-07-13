@@ -2,6 +2,9 @@ package com.jiang.friendsGatheringBackend.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jiang.friendsGatheringBackend.common.BaseResponse;
 import com.jiang.friendsGatheringBackend.common.ErrorCode;
 import com.jiang.friendsGatheringBackend.common.ResultUtils;
@@ -9,12 +12,16 @@ import com.jiang.friendsGatheringBackend.exception.BusinessException;
 import com.jiang.friendsGatheringBackend.model.request.userLoginRequest;
 import com.jiang.friendsGatheringBackend.model.request.userRegisterRequest;
 import com.jiang.friendsGatheringBackend.model.domain.User;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
+import com.jiang.friendsGatheringBackend.model.vo.LoginUserVO;
 import com.jiang.friendsGatheringBackend.service.impl.UserServiceImpl;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -69,7 +76,7 @@ public class userController {
      * @return
      */
     @PostMapping("/login")
-    public BaseResponse<User> userLogin(userLoginRequest userLoginRequest1, HttpServletRequest request){
+    public BaseResponse<String> userLogin(@RequestBody userLoginRequest userLoginRequest1, HttpServletRequest request){
         if(userLoginRequest1==null){
             return ResultUtils.error(ErrorCode.PARAMS_ERROR);
         }
@@ -78,9 +85,14 @@ public class userController {
         if(StringUtils.isAnyBlank(userAccount,userPassword)){
             return  ResultUtils.error(ErrorCode.PARAMS_ERROR);
         }
-        User user1= userService.userLogin(userAccount,userPassword,request);
-        if(user1==null)return ResultUtils.error(ErrorCode.NULL_ERROR,"未登录");
-        return ResultUtils.success(user1);
+
+        String sessionId= null;
+        try {
+            sessionId = userService.userLogin(userAccount,userPassword,request);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        return ResultUtils.success(sessionId);
     }
 
 
@@ -149,11 +161,11 @@ public class userController {
      * @return
      */
     @GetMapping("/recommend")
-    public BaseResponse<Page<User>> recommend(long pageSize,long pageNum,HttpServletRequest request){
+    public BaseResponse<Page<User>> recommend(@RequestParam long pageSize,@RequestParam long pageNum,HttpServletRequest request){
         //获取当前登录用户
-        User loginUser = userService.getLoginUser(request);
+        SessionData loginUser = userService.getLoginUser(request);
         //从缓存中读取数据
-        String redisKey = String.format("friendsGathering:user:recommend:%s",loginUser.getId());
+        String redisKey = String.format("friendsGathering:user:recommend:%s+%s+%s",loginUser.getUserId(),pageNum,pageSize);
         ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
         Page<User> page = (Page<User>) valueOperations.get(redisKey);
         if(page!=null){
@@ -178,8 +190,35 @@ public class userController {
         if(num<0||num>20){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"匹配人数不能超过20人，也不能为空");
         }
-        User loginUser = userService.getLoginUser(request);
+        SessionData loginUser = userService.getLoginUser(request);
         return ResultUtils.success(userService.matchUser(num,loginUser));
     }
 
+
+    @PostMapping("/tags")
+    public ResponseEntity<BaseResponse> uploadTags(@RequestBody String tagsJson,HttpServletRequest request) {
+        // 将 JSON 字符串转换为 List<String>
+        List<String> tags;
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            tags = objectMapper.readValue(tagsJson, new TypeReference<List<String>>() {});
+        } catch (JsonProcessingException e) {
+            return ResponseEntity.badRequest().body(new BaseResponse(ErrorCode.PARAMS_ERROR,"Invalid tagsString"));
+        }
+
+        // 校验 tags 是否合法
+        if (tags == null || tags.isEmpty()) {
+            return ResponseEntity.badRequest().body(new BaseResponse(ErrorCode.PARAMS_ERROR, "Tags must not be empty"));
+        }
+
+        // 转换为 JSON 字符串保存到数据库
+        try {
+            String tagsJsonString = new ObjectMapper().writeValueAsString(tags);
+            // 调用 UserService 的方法保存 tagsJson 到数据库
+            userService.saveUserTags(tagsJsonString,request);
+            return ResponseEntity.ok().body(new BaseResponse(ErrorCode.SUCCESS, "Tags uploaded successfully"));
+        } catch (JsonProcessingException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new BaseResponse(ErrorCode.SYSTEM_ERROR, "Failed to process tags"));
+        }
+    }
 }

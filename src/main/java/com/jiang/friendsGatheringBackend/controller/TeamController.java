@@ -10,6 +10,7 @@ import com.jiang.friendsGatheringBackend.model.domain.User;
 import com.jiang.friendsGatheringBackend.model.domain.UserTeam;
 import com.jiang.friendsGatheringBackend.model.dto.TeamQuery;
 import com.jiang.friendsGatheringBackend.model.request.*;
+import com.jiang.friendsGatheringBackend.model.session.SessionData;
 import com.jiang.friendsGatheringBackend.model.vo.TeamUserVO;
 import com.jiang.friendsGatheringBackend.service.TeamService;
 import com.jiang.friendsGatheringBackend.service.UserService;
@@ -52,7 +53,7 @@ public class TeamController {
         if(teamAddRequest==null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"队伍信息为空");
         }
-        User loginUser = userService.getLoginUser(request);
+        SessionData loginUser = userService.getLoginUser(request);
         Team team = new Team();
         BeanUtils.copyProperties(teamAddRequest,team);
         long teamId = teamService.createTeam(team, loginUser);
@@ -78,8 +79,8 @@ public class TeamController {
                                         .map(teamUserVO -> teamUserVO.getId())
                                         .collect(Collectors.toList());
         //4.判断当前用户是否已加入了队伍
-        User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
+        SessionData loginUser = userService.getLoginUser(request);
+        Long userId = Long.valueOf(loginUser.getUserId());
         //判断用户是否在满足查询条件的这些队伍中
         QueryWrapper<UserTeam> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("userId",userId);
@@ -119,7 +120,7 @@ public class TeamController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"您提供的修改请求为空");
         }
 
-        User loginUser = userService.getLoginUser(request);
+        SessionData loginUser = userService.getLoginUser(request);
         boolean result = teamService.updateTeam(teamUpdateRequest, loginUser);
         if(!result){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"更新失败");
@@ -178,7 +179,7 @@ public class TeamController {
         if(teamDeleteRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数为空");
         }
-        User loginUser = userService.getLoginUser(request);
+        SessionData loginUser = userService.getLoginUser(request);
         Boolean result = teamService.deleteTeam(teamDeleteRequest, loginUser);
         if(!result){
             throw new BusinessException(ErrorCode.SYSTEM_ERROR,"删除队伍失败");
@@ -193,8 +194,8 @@ public class TeamController {
      */
     @GetMapping("/list/my/join")
     public BaseResponse<List<TeamUserVO>> listMyJoinTeam(TeamQuery teamQuery, HttpServletRequest request){
-        User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
+        SessionData loginUser = userService.getLoginUser(request);
+        Long userId = Long.valueOf(loginUser.getUserId());
         QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
         userTeamQueryWrapper.eq("userId",userId);
         List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
@@ -212,8 +213,8 @@ public class TeamController {
      */
     @GetMapping("/list/my/create")
     public BaseResponse<List<TeamUserVO>> listMyCreateTeam(TeamQuery teamQuery,HttpServletRequest request){
-        User loginUser = userService.getLoginUser(request);
-        Long userId = loginUser.getId();
+        SessionData loginUser = userService.getLoginUser(request);
+        Long userId = Long.valueOf(loginUser.getUserId());
         QueryWrapper<Team> teamWrapper = new QueryWrapper<>();
         teamWrapper.eq("userId",userId);
         List<Team> teamList = teamService.list(teamWrapper);
